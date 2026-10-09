@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>آپلود سنتر شرکتی</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Tahoma, sans-serif;
+            background-color: #008080; /* رنگ کلاسیک دسکتاپ ویندوز */
+            color: white;
+            overflow: hidden;
+            user-select: none;
+        }
+        #desktop {
+            display: flex;
+            flex-direction: column;
+            flex-wrap: wrap;
+            height: 100vh;
+            padding: 20px;
+            gap: 20px;
+            align-content: flex-start;
+        }
+        .icon-item {
+            width: 80px;
+            text-align: center;
+            cursor: pointer;
+            padding: 10px;
+            border: 1px solid transparent;
+            border-radius: 5px;
+        }
+        .icon-item:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            border: 1px dotted #fff;
+        }
+        .icon {
+            font-size: 40px;
+            margin-bottom: 5px;
+            display: block;
+        }
+        .icon-name {
+            font-size: 12px;
+            word-wrap: break-word;
+            text-shadow: 1px 1px 2px black;
+        }
+        /* پنجره پوشه */
+        #window {
+            display: none;
+            position: absolute;
+            top: 50px; left: 50px; right: 50px; bottom: 50px;
+            background-color: #f0f0f0;
+            color: black;
+            border: 2px solid #0055ea;
+            border-radius: 5px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
+            flex-direction: column;
+        }
+        .window-header {
+            background: linear-gradient(to right, #0058e6, #3a93ff);
+            color: white;
+            padding: 10px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .close-btn {
+            background: #ff4040; color: white;
+            border: 1px solid white; cursor: pointer; padding: 2px 10px; border-radius: 3px;
+        }
+        .toolbar {
+            background: #e4e4e4; padding: 10px; border-bottom: 1px solid #ccc;
+            display: flex; gap: 10px; align-items: center;
+        }
+        .toolbar button, .toolbar input { padding: 5px 15px; cursor: pointer; font-family: Tahoma; }
+        .window-content {
+            flex: 1; padding: 20px; overflow-y: auto;
+            display: flex; flex-wrap: wrap; gap: 20px; align-content: flex-start;
+        }
+        .file-menu { display: flex; gap: 5px; margin-top: 5px; justify-content: center;}
+        .file-menu button { font-size: 10px; cursor: pointer; padding: 2px 5px; }
+        
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 1000;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .login-box {
+            background: white; padding: 30px; border-radius: 5px; color: black; text-align: center;
+        }
+        .login-box input { padding: 10px; margin: 10px 0; width: 200px; }
+        .login-box button { padding: 10px 20px; cursor: pointer; background: #0058e6; color: white; border: none; }
+    </style>
+</head>
+<body>
+
+    <!-- صفحه ورود -->
+    <div id="overlay">
+        <div class="login-box">
+<button style="float:left;padding:10px;font-family:tahoma;font-size:medimu;border:0;background-color:Navy;color:white;" onclick="go_back();">بازگشت به هاب</button>
+            <h3>ورود به سیستم فایل شرکتی</h3>
+            <p>لطفاً نام خود را وارد کنید:</p>
+            <input type="text" id="usernameInput" placeholder="مثلا: Ali">
+            <br>
+            <button onclick="login()">ورود / ساخت پوشه</button>
+        </div>
+    </div>
+
+    <!-- دسکتاپ -->
+    <div id="desktop">
+
+</div>
+
+    <!-- پنجره پوشه -->
+    <div id="window">
+        <div class="window-header">
+            <span id="windowTitle">پوشه</span>
+            <button class="close-btn" onclick="closeWindow()">X</button>
+        </div>
+        <div class="toolbar" id="toolbar">
+            <input type="file" id="fileInput">
+            <button onclick="uploadFile()" id="uploadBtn">آپلود فایل</button>
+            <span id="uploadStatus" style="color: green; font-size: 12px;"></span>
+        </div>
+        <div class="window-content" id="windowContent"></div>
+    </div>
+
+    <script>
+        let currentUser = localStorage.getItem('username');
+        let currentFolder = '';
+
+        window.onload = () => {
+            if (currentUser) {
+                document.getElementById('overlay').style.display = 'none';
+                loadDesktop();
+            }
+        };
+
+        async function login() {
+            const val = document.getElementById('usernameInput').value.trim();
+            if (!val) return alert("نام کاربری نمی‌تواند خالی باشد");
+            
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: val})
+            });
+            if (res.ok) {
+                currentUser = val;
+                localStorage.setItem('username', val);
+                document.getElementById('overlay').style.display = 'none';
+                loadDesktop();
+            }
+        }
+
+        async function loadDesktop() {
+            const res = await fetch('/api/folders');
+            const folders = await res.json();
+            const desktop = document.getElementById('desktop');
+            desktop.innerHTML = '';
+            
+            folders.forEach(folder => {
+                const div = document.createElement('div');
+                div.className = 'icon-item';
+                div.ondblclick = () => openFolder(folder);
+                div.innerHTML = `
+                    <span class="icon">📁</span>
+                    <span class="icon-name">${folder}</span>
+                `;
+                desktop.appendChild(div);
+            });
+        }
+
+        async function openFolder(folder) {
+            currentFolder = folder;
+            document.getElementById('windowTitle').innerText = 'پوشه: ' + folder;
+            document.getElementById('window').style.display = 'flex';
+            
+            // نمایش/مخفی کردن نوار آپلود بر اساس دسترسی
+            const toolbar = document.getElementById('toolbar');
+            if (currentUser === folder) {
+                toolbar.style.display = 'flex';
+            } else {
+                toolbar.style.display = 'none';
+            }
+            
+            loadFiles();
+        }
+
+        function closeWindow() {
+            document.getElementById('window').style.display = 'none';
+            document.getElementById('fileInput').value = '';
+            document.getElementById('uploadStatus').innerText = '';
+        }
+
+        async function loadFiles() {
+            const res = await fetch(`/api/files/${currentFolder}`);
+            const files = await res.json();
+            const content = document.getElementById('windowContent');
+            content.innerHTML = '';
+
+            files.forEach(file => {
+                const div = document.createElement('div');
+                div.className = 'icon-item';
+                
+                let fileHTML = `
+                    <div ondblclick="downloadFile('${file}')">
+                        <span class="icon">📄</span>
+                        <span class="icon-name">${file}</span>
+                    </div>
+                `;
+
+                // دکمه‌های ویرایش فقط برای صاحب پوشه
+                if (currentUser === currentFolder) {
+                    fileHTML += `
+                        <div class="file-menu">
+                            <button onclick="renameFile('${file}')">تغییر نام</button>
+                            <button onclick="deleteFile('${file}')" style="color:red;">حذف</button>
+                        </div>
+                    `;
+                }
+
+                div.innerHTML = fileHTML;
+                content.appendChild(div);
+            });
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files.length) return alert('فایلی انتخاب نشده است');
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            const res = await fetch(`/api/upload/${currentFolder}`, {
+                method: 'POST',
+                headers: { 'X-Username': currentUser },
+                body: formData
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('uploadStatus').innerText = 'آپلود شد!';
+                fileInput.value = '';
+                setTimeout(() => document.getElementById('uploadStatus').innerText = '', 2000);
+                loadFiles();
+            } else {
+                alert(data.error);
+            }
+        }
+
+        async function deleteFile(filename) {
+            if (!confirm(`آیا از حذف ${filename} مطمئن هستید؟`)) return;
+
+            const res = await fetch(`/api/delete/${currentFolder}/${filename}`, {
+                method: 'DELETE',
+                headers: { 'X-Username': currentUser }
+            });
+            const data = await res.json();
+            if (data.success) loadFiles();
+            else alert(data.error);
+        }
+
+        async function renameFile(oldName) {
+            const newName = prompt('نام جدید را وارد کنید:', oldName);
+            if (!newName || newName === oldName) return;
+
+            const res = await fetch(`/api/rename/${currentFolder}`, {
+                method: 'PUT',
+                headers: { 
+                    'X-Username': currentUser,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ old_name: oldName, new_name: newName })
+            });
+            const data = await res.json();
+            if (data.success) loadFiles();
+            else alert(data.error);
+        }
+
+        function downloadFile(filename) {
+            window.open(`/download/${currentFolder}/${filename}`, '_blank');
+        }
+    </script>
+</body>
+</html>
